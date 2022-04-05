@@ -1,0 +1,7 @@
+---
+applications:
+  - name:  gecurrent-div-blobstore-app
+    buildpack: java_buildpack
+    stack : cflinuxfs2    
+    memory: 2G
+    path: target/div-blobstore-app-0.0.1-SNAPSHOT.jar

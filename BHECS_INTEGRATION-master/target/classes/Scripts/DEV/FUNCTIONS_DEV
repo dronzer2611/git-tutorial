@@ -1,0 +1,1929 @@
+-- FUNCTION: bhecms.insert_into_master_refrencecode()
+
+-- DROP FUNCTION bhecms.insert_into_master_refrencecode();
+
+CREATE OR REPLACE FUNCTION bhecms.insert_into_master_refrencecode(
+	OUT p_msg character varying)
+    RETURNS character varying
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+    
+AS $BODY$
+declare
+stgrec record;
+comp_cd varchar(50);
+com_dsc varchar(150);
+ref_code varchar(15);
+begin
+/*insert into bhecms.bh_ecs_master_drm_refcode
+       (parent_id ,company_name,company_desc,active_flag,created_by,created_date,last_updated_by,last_updated_date)
+      (select '000000' reference_code,'','Default','Y','System',now(),'System',now());
+select parent_id into ref_code from  bhecms.bh_ecs_master_drm_refcode where parent_id='000000';
+ raise notice '%',ref_code;
+
+if (ref_code<>'000000') then 
+insert into bhecms.bh_ecs_master_drm_refcode
+       (parent_id ,company_name,company_desc,active_flag,created_by,created_date,last_updated_by,last_updated_date)
+      (select '000000' reference_code,'','Default','Y','System',now(),'System',now());
+end if;*/
+
+
+  for stgrec in (select seq_id,
+                        reference_code,
+                        substring(upper(company_code),4,4) com_code, 
+                        reference_description
+                 from   bhecms.bh_ecs_stg_drm_refcode
+                 where  upper(process_status) = 'N' 
+                order by reference_code)
+                 
+                 
+  loop    
+comp_cd:=(select distinct company_code from bhecms.bh_ecs_master_drm_refcode 
+ where company_code in
+ (select  substring(upper(company_code),4,4) from bhecms.bh_ecs_stg_drm_refcode
+ where substring(upper(company_code),4,4)=stgrec.com_code));
+com_dsc:=(select distinct reference_description  from bhecms.bh_ecs_master_drm_refcode where reference_description in 
+          (select  reference_description from bhecms.bh_ecs_stg_drm_refcode  where reference_description= stgrec.reference_description));
+raise notice '%',comp_cd;
+raise notice '%',stgrec.com_code;
+raise notice '%' ,com_dsc;
+raise notice '%' ,stgrec.reference_description;
+
+
+    if (stgrec.com_code=comp_cd and stgrec.reference_description=com_dsc) then
+         begin
+      
+        update bhecms.bh_ecs_stg_drm_refcode
+        set  error_code = 'Failed',
+             error_desc = 'Company_code and description already present in master',
+             last_updated_date=now()
+             where company_code=stgrec.com_code;
+      end;
+    else 
+    insert into bhecms.bh_ecs_master_drm_refcode
+       (reference_code ,company_code,reference_description,active_flag,created_by,created_date,last_updated_by,last_updated_date,reference_le)
+        (select '000000' reference_code,'','Default','Y','System',now(),'System',now(),NULL
+        union
+     select reference_code, substring(upper(company_code),4,4),reference_description , 'Y',
+       'System',now(),'System',now(),substring(upper(reference_le),4)
+        from bhecms.bh_ecs_stg_drm_refcode
+ order by reference_code);
+ 
+        update bhecms.bh_ecs_stg_drm_refcode
+        set  error_code = 'Success',
+             error_desc = 'Record added into master table successfully....',
+             last_updated_date=now()
+        where  seq_id = stgrec.seq_id;     
+    
+    end if; 
+    
+end loop;  
+    begin
+          update bhecms.bh_ecs_stg_drm_refcode
+          set    process_status = 'P'
+          where    upper(process_status) = 'N';
+         end; 
+  p_msg := coalesce(p_msg,'SUCCESS');    
+  
+exception
+  when others then
+    p_msg := 'Fail ' || sqlerrm;
+ 
+     
+end;  
+$BODY$;
+
+-- FUNCTION: bhecms.insert_into_master_projcode()
+
+-- DROP FUNCTION bhecms.insert_into_master_projcode();
+
+CREATE OR REPLACE FUNCTION bhecms.insert_into_master_projcode(
+	OUT p_msg character varying)
+    RETURNS character varying
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+    
+AS $BODY$
+declare
+stgrec record;
+proj_cd varchar(50);
+
+ 
+
+begin
+
+ 
+
+  for stgrec in (select seq_id,
+                        project_id,
+                        project_desc
+                 from   bhecms.bh_ecs_stg_drm_projcode
+                 where  upper(process_status) = 'N'
+                 order by project_id )
+  loop    
+proj_cd:=(select distinct project_code from bhecms.bh_ecs_master_drm_projcode where project_code=stgrec.project_id);
+          
+          
+raise notice '%',proj_cd;
+raise notice '%',stgrec.project_id;
+    if (stgrec.project_id=proj_cd) then
+         begin
+      
+        update bhecms.bh_ecs_stg_drm_projcode
+        set  error_code = 'Failed',
+             error_desc = 'PROJECT CODE already present in master table',
+             last_updated_date=now()
+             where  seq_id = stgrec.seq_id;
+      end;
+    else 
+      
+      insert into bhecms.bh_ecs_master_drm_projcode    
+   (project_code,project_desc,active_flag,created_by,created_date,last_updated_by,last_updated_date)    
+   select project_id,project_desc,'Y','SYSTEM',now(),'SYSTEM',now() from bhecms.bh_ecs_stg_drm_projcode
+   where project_id=stgrec.project_id
+   order by project_id;
+        update bhecms.bh_ecs_stg_drm_projcode
+        set  error_code = 'Success',
+             error_desc = 'Record added into master table successfully....',
+             last_updated_date=now()
+        where  seq_id = stgrec.seq_id;     
+    
+    end if; 
+    
+end loop;  
+    begin
+          update bhecms.bh_ecs_stg_drm_projcode
+          set    process_status = 'P'
+          where    upper(process_status) = 'N';
+         end; 
+  p_msg := coalesce(p_msg,'SUCCESS');    
+  
+exception
+  when others then
+    p_msg := 'Fail ' || sqlerrm;
+ 
+     
+end;  
+$BODY$;
+
+-- FUNCTION: bhecms.insert_into_master_parent_le()
+
+-- DROP FUNCTION bhecms.insert_into_master_parent_le();
+
+CREATE OR REPLACE FUNCTION bhecms.insert_into_master_parent_le(
+	OUT p_msg character varying)
+    RETURNS character varying
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+    
+AS $BODY$
+
+declare
+
+ 
+
+stgrec  record;
+
+begin
+
+ 
+
+  for stgrec in (select seq_id,
+
+                        legal_entity,
+
+                        parent_legal_entity,
+
+                        active_flag
+
+                 from   bhecms.bh_ecs_stg_parent_le
+
+                 where  upper(process_status) = 'N')
+
+  loop
+
+    if not (stgrec.legal_entity is null or stgrec.parent_legal_entity is null) then
+
+         begin
+
+        insert into bhecms.bh_ecs_master_parent_le
+
+          (legal_entity, parent_legal_entity, active_flag,
+
+           created_by, created_date, last_updated_by, last_updated_date)
+
+           values(stgrec.legal_entity, stgrec.parent_legal_entity, stgrec.active_flag,
+
+                  'SYSTEM', now(), 'SYSTEM', now());
+
+        update bhecms.bh_ecs_stg_parent_le
+
+             set    error_code = 'SUCCESS',
+
+                    error_desc = 'Record added into master table successfully....'
+
+             where  seq_id = stgrec.seq_id;     
+
+         exception
+
+        when others then
+
+               update bhecms.bh_ecs_stg_parent_le
+
+               set    error_code = 'FAILED',
+
+                      error_desc = 'Error while inserting record into master table'
+
+               where  seq_id = stgrec.seq_id;
+
+               p_msg := 'Fail';
+
+      end;
+
+       else
+
+      update bhecms.bh_ecs_stg_parent_le
+
+         set    error_code = 'FAILED',
+
+                error_desc = 'Either legal entity is null or parent legal entity is null'
+
+         where  seq_id = stgrec.seq_id;
+
+         p_msg := 'Fail';
+
+       end if;
+
+  end loop; 
+
+  begin
+
+    update bhecms.bh_ecs_stg_parent_le
+
+    set    process_status = 'P'
+
+    where  upper(process_status) = 'N';
+
+  end;
+
+  p_msg := coalesce(p_msg,'Success');
+
+ 
+
+exception
+
+  when others then
+
+    p_msg := 'Fail';
+
+end; 
+
+$BODY$;
+
+
+-- FUNCTION: bhecms.insert_into_master_fdl_mapping()
+
+-- DROP FUNCTION bhecms.insert_into_master_fdl_mapping();
+
+CREATE OR REPLACE FUNCTION bhecms.insert_into_master_fdl_mapping(
+	)
+    RETURNS character varying
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+    
+AS $BODY$
+
+declare
+
+ 
+
+stgrec     record;
+
+cOldValue  varchar(200) := null;
+
+ 
+
+begin
+
+ 
+
+  for stgrec in (select seq_id,
+
+                        substring(gold_id, 4) gold_id,
+
+                        substring(es_company_code, strpos(es_company_code,'_')+1) es_comp_code,
+
+                        es_company_code_description,
+
+                        (case
+
+                           when local_cost_center is not null then
+
+                             substring(local_cost_center, strpos(local_cost_center,'_')+1)
+
+                           else
+
+                             null
+
+                         end) local_cost_center,
+
+                        local_cost_center_description,
+
+                        (case
+
+                           when local_me is not null then
+
+                             substring(local_me, strpos(local_me,'_')+1)
+
+                           else
+
+                             null
+
+                         end) local_me,
+
+                        local_me_description,
+
+                        substring(es_function_code, strpos(es_function_code,'_')+1) es_func_code,
+
+                        es_function_desc,
+
+                        substring(es_product_line, strpos(es_product_line,'_')+1) es_prod_line,
+
+                        es_product_line_desc,
+
+                                   erp_system
+
+                 from   bhecms.bh_ecs_stg_fdl_mapping
+
+                 where  not (gold_id is null or (local_cost_center is null and local_me is null))
+
+                 and    upper(process_status) = 'N'
+
+                 order by gold_id, coalesce(local_cost_center,local_me))
+
+  loop
+
+    if coalesce(cOldValue, 'X') <> stgrec.gold_id||coalesce(stgrec.local_cost_center, stgrec.local_me) then
+
+      begin
+
+        insert into bhecms.bh_ecs_master_fdl_mapping
+
+          (gold_id, es_company_code, es_company_code_description, cost_center, cost_center_description,
+
+           es_function_code, es_function_desc, es_product_line, es_product_line_desc, erp_system,
+
+           active_flag, created_by, created_date, last_updated_by, last_updated_date)   
+
+           values(stgrec.gold_id,
+
+                  substring(stgrec.es_comp_code, strpos(stgrec.es_comp_code,'_')+1),
+
+                  substring(stgrec.es_company_code_description,8),
+
+                  (case
+
+                     when stgrec.local_cost_center is null then
+
+                       substring(stgrec.local_me, strpos(stgrec.local_me,'_')+1)
+
+                     else
+
+                    substring(stgrec.local_cost_center, strpos(stgrec.local_cost_center,'_')+1)              
+
+                   end), 
+
+                  coalesce(stgrec.local_cost_center_description, stgrec.local_me_description),
+
+                  substring(stgrec.es_func_code, strpos(stgrec.es_func_code,'_')+1),
+
+                  stgrec.es_function_desc,
+
+               substring(stgrec.es_prod_line, strpos(stgrec.es_prod_line,'_')+1),
+
+               stgrec.es_product_line_desc, stgrec.erp_system,
+
+               'Y', 'SYSTEM', now(), 'SYSTEM', now());
+
+        update bhecms.bh_ecs_stg_fdl_mapping
+
+             set    error_code = 'Success',
+
+                    error_desc = 'Record added into master table successfully....'
+
+             where  seq_id = stgrec.seq_id;     
+
+         exception
+
+        when others then
+
+             update bhecms.bh_ecs_stg_fdl_mapping
+
+               set    error_code = 'Failed',
+
+                      error_desc = 'Error while inserting record into master table'
+
+               where  seq_id = stgrec.seq_id;
+
+      end;
+
+    else
+
+      update bhecms.bh_ecs_stg_fdl_mapping
+
+         set    error_code = 'Failed',
+
+                error_desc = 'Duplicate gold id and cost center'
+
+         where  seq_id = stgrec.seq_id;
+
+    end if;
+
+       cOldValue := stgrec.gold_id||coalesce(stgrec.local_cost_center, stgrec.local_me);
+
+  end loop;
+
+  begin
+
+    update bhecms.bh_ecs_stg_fdl_mapping    
+
+    set    error_code = 'Failed',
+
+              error_desc = 'Either gold id is null or the cost centers are null'
+
+       where  (gold_id is null or (local_cost_center is null and local_me is null));  
+
+  end;  
+
+  begin
+
+    update bhecms.bh_ecs_stg_fdl_mapping
+
+    set    process_status = 'P'
+
+    where  upper(process_status) = 'N';
+
+  end; 
+
+  return 'Done...';
+
+exception
+
+  when others then
+
+     return 'Error... ' || sqlerrm;
+
+    
+
+end; 
+
+$BODY$;
+
+
+-- FUNCTION: bhecms.insert_into_master_drm_uei()
+
+-- DROP FUNCTION bhecms.insert_into_master_drm_uei();
+
+CREATE OR REPLACE FUNCTION bhecms.insert_into_master_drm_uei(
+	OUT p_msg character varying)
+    RETURNS character varying
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+    
+AS $BODY$
+
+ 
+
+declare
+
+ 
+
+ stgrec  record;
+  
+begin
+
+ 
+
+  for stgrec in (select seq_id,
+                        uei_code,
+                        uei_description,
+                        uei_product_company,
+                        uei_company_code,
+                        uei_le
+                 from   bhecms.bh_ecs_stg_drm_uei
+                 where  upper(process_status) = 'N')
+  loop
+    if not (stgrec.uei_code is null or stgrec.uei_product_company is null or stgrec.uei_le is null) then
+      begin
+        insert into bhecms.bh_ecs_master_drm_uei
+          (uei_code, uei_description, uei_product_company, uei_company_code, uei_le, active_flag, 
+           created_by, created_date, last_updated_by, last_updated_date)
+        values(stgrec.uei_code, stgrec.uei_description, substring(stgrec.uei_product_company,4), 
+               substring(stgrec.uei_company_code,4), stgrec.uei_le, 'Y', 'SYSTEM', now(), 'SYSTEM', now());
+        update bhecms.bh_ecs_stg_drm_uei
+        set    error_code = 'SUCCESS',
+               error_desc = 'Record added into master table successfully....'
+        where  seq_id = stgrec.seq_id;      
+      exception
+        when others then
+          update bhecms.bh_ecs_stg_drm_uei
+          set    error_code = 'FAILED',
+                 error_desc = 'Error while inserting record into master table'
+          where  seq_id = stgrec.seq_id;
+          p_msg := 'Fail ' || sqlerrm;
+      end;
+    else
+      update bhecms.bh_ecs_stg_drm_uei
+      set    error_code = 'FAILED',
+             error_desc = 'Either uei code is null or uei product company or uei le is null'
+      where  seq_id = stgrec.seq_id; 
+      p_msg := 'Fail ' || sqlerrm;
+    end if;
+  end loop;    
+  begin
+    update bhecms.bh_ecs_stg_drm_uei
+    set    process_status = 'P'
+    where  upper(process_status) = 'N';
+  end; 
+  p_msg := coalesce(p_msg,'Success');    
+  
+exception
+  when others then
+    p_msg := 'Fail ' || sqlerrm;
+end;  
+
+ 
+
+$BODY$;
+
+---Workday Outbound View and Function
+
+-- View: bhecms.bh_ecs_wd_outbound_mv
+
+ 
+
+-- DROP MATERIALIZED VIEW bhecms.bh_ecs_wd_outbound_mv;
+
+ 
+
+CREATE MATERIALIZED VIEW bhecms.bh_ecs_wd_outbound_mv
+TABLESPACE pg_default
+AS
+ SELECT emp.wd_employee_id,
+    '000000'::text AS ol_cost_center,
+    rqcl.company_code,
+    rqcl.cost_center,
+    rqcl.product_line,
+    rqcl.project_code,
+    rqcl.reference_code,
+    rqd.cost_type,
+    rqd.direct_indirect,
+    rqcl.legacy_adn,
+    rqd.effective_date,
+    emp.costing_request_detail_id
+   FROM bhecms.bh_ecs_emp_details emp,
+    bhecms.bh_ecs_costing_request_details rqd,
+    bhecms.bh_ecs_costing_request_cl rqcl
+  WHERE emp.costing_request_detail_id = rqd.costing_request_detail_id AND rqd.costing_request_detail_id = rqcl.costing_request_detail_id AND rqd.status::text = 'APPROVED'::text AND rqd.effective_date < date(now() + '1 day'::interval) AND upper(emp.wd_outbound_status::text) = 'N'::text
+WITH DATA;
+
+ 
+CREATE OR REPLACE FUNCTION bhecms.bh_ecs_workday_outbound(
+    )
+    RETURNS TABLE(wd_employee_id character varying, ol_cost_center text, company_code character varying, cost_center character varying, product_line character varying, project_code character varying, reference_code character varying, cost_type character varying, direct_indirect character varying, legacy_adn character varying, effective_date timestamp without time zone) 
+    LANGUAGE 'plpgsql'
+
+ 
+
+ 
+
+ 
+
+    COST 100
+    VOLATILE 
+    ROWS 1000
+AS $BODY$
+DECLARE
+i record;
+
+ 
+
+ 
+
+ 
+
+BEGIN
+
+ 
+
+ 
+
+ 
+
+REFRESH MATERIALIZED VIEW bhecms.bh_ecs_wd_outbound_mv;
+return query
+select wd.wd_employee_id,
+       '000000',
+       wd.company_code,
+       wd.cost_center,
+       wd.product_line,
+       wd.project_code,
+       wd.reference_code,
+       wd.cost_type,
+       wd.direct_indirect,
+       wd.legacy_adn,
+       wd.effective_date from bhecms.bh_ecs_wd_outbound_mv wd;
+
+ 
+
+ 
+
+ 
+
+for i in (select distinct a.wd_employee_id,a.costing_request_detail_id from bhecms.bh_ecs_wd_outbound_mv a)
+loop
+update bhecms.bh_ecs_emp_details c set end_date=now()
+    where c.end_date=null
+    and c.wd_employee_id=i.wd_employee_id
+    and c.wd_outbound_status='Y';
+    
+    update bhecms.bh_ecs_emp_details b set wd_outbound_status='Y'
+    where  b.wd_employee_id=i.wd_employee_id
+    and b.costing_request_detail_id=i.costing_request_detail_id
+    and b.wd_outbound_status='N';
+
+ 
+
+    
+end loop;
+     
+END;
+$BODY$;
+
+-- View: bhecms.bh_ecs_hrdl_outbound_mv
+
+-- DROP MATERIALIZED VIEW bhecms.bh_ecs_hrdl_outbound_mv;
+
+CREATE MATERIALIZED VIEW bhecms.bh_ecs_hrdl_outbound_mv
+TABLESPACE pg_default
+AS
+ SELECT emp.wd_employee_id,
+    rqd.effective_date,
+    rqcl.cost_center,
+    emp.cost_center_description,
+    rqd.direct_indirect,
+    rqd.concur_group,
+    rqd.cost_type,
+    rqd.last_updated_by,
+    rqd.last_updated_date,
+    rqcl.function_code,
+    rqcl.project_code,
+    rqcl.reference_code,
+    rqcl.legacy_adn,
+    rqcl.company_code,
+    rqcl.product_line,
+    rqd.proposed_costing_string,
+    'N'::text AS rechrg_flag,
+    emp.costing_request_detail_id
+   FROM bhecms.bh_ecs_emp_details emp,
+    bhecms.bh_ecs_costing_request_details rqd,
+    bhecms.bh_ecs_costing_request_cl rqcl
+  WHERE emp.costing_request_detail_id = rqd.costing_request_detail_id AND rqd.costing_request_detail_id = rqcl.costing_request_detail_id AND rqd.status::text = 'APPROVED'::text AND rqd.effective_date < date(now() + '1 day'::interval) AND upper(emp.hrdl_outbound_status::text) = 'N'::text
+WITH DATA;
+
+-- FUNCTION: bhecms.bh_ecs_hrdl_outbound()
+
+-- DROP FUNCTION bhecms.bh_ecs_hrdl_outbound();
+
+CREATE OR REPLACE FUNCTION bhecms.bh_ecs_hrdl_outbound(
+	)
+    RETURNS TABLE(wd_employee_id character varying, effective_date timestamp without time zone, cost_center character varying, cost_center_description character varying, direct_indirect character varying, concur_group character varying, cost_type character varying, last_updated_by character varying, last_updated_date timestamp without time zone, function_code character varying, project_code character varying, reference_code character varying, legacy_adn character varying, company_code character varying, product_line character varying, proposed_costing_string character varying, rechrg_flag text) 
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+    ROWS 1000
+    
+AS $BODY$
+DECLARE
+i record;
+
+ 
+
+BEGIN
+
+ 
+
+REFRESH MATERIALIZED VIEW bhecms.bh_ecs_hrdl_outbound_mv;
+return query
+select wd.wd_employee_id,
+       wd.effective_date,
+       wd.cost_center,
+       wd.cost_center_description,
+       wd.direct_indirect,
+       wd.concur_group,
+       wd.cost_type,
+       wd.last_updated_by,
+       wd.last_updated_date,
+  wd.function_code,
+  wd.project_code,
+  wd.reference_code,
+  wd.legacy_adn,
+  wd.company_code,
+  wd.product_line,
+  wd.proposed_costing_string,
+  wd.rechrg_flag from bhecms.bh_ecs_hrdl_outbound_mv wd;
+
+ 
+
+for i in (select distinct a.wd_employee_id,a.costing_request_detail_id from bhecms.bh_ecs_hrdl_outbound_mv a)
+loop
+update bhecms.bh_ecs_emp_details c set end_date=now()
+where c.end_date=null
+and c.wd_employee_id=i.wd_employee_id
+and c.hrdl_outbound_status='Y';
+update bhecms.bh_ecs_emp_details b set hrdl_outbound_status='Y'
+    where  b.wd_employee_id=i.wd_employee_id
+and b.costing_request_detail_id=i.costing_request_detail_id
+    and b.hrdl_outbound_status='N';
+
+end loop;
+     
+END;
+$BODY$;
+
+
+
+
+
+
+
+
+-- FUNCTION: bhecms.request_insert()
+
+-- DROP FUNCTION bhecms.request_insert();
+
+CREATE OR REPLACE FUNCTION bhecms.request_insert(
+	OUT p_out_msg character varying)
+    RETURNS character varying
+    LANGUAGE 'plpgsql'
+
+    COST 100
+    VOLATILE 
+    
+AS $BODY$
+
+declare
+
+m_request_id  integer;
+
+m_request_detail_id integer;
+
+m_request_status varchar(50);
+
+m_effective_date timestamp;
+
+mStartDate       timestamp;
+
+ m_req_status varchar(50);
+
+m_request_type varchar(15);
+
+m_workflow_id integer;
+
+m_workflow_step_id integer;
+
+ m_direct_indirect varchar(15);
+
+m_cost_type varchar(15);
+
+m_cost_center varchar(15);
+
+m_project_code varchar(15);
+
+m_reference_code varchar(15);
+
+m_company_code  varchar(15);
+
+m_function_code varchar(15);
+
+m_product_line varchar(15);
+
+m_legacy_adn  varchar(100);
+
+m_proposed_cstring varchar(300);
+
+ 
+
+ i         record;
+
+j         record;
+
+nParentLe integer;
+
+begin
+
+ 
+
+  for i in (select event_type,            
+
+                   wd_employee_id,
+
+                   sso_id,
+
+                   emp_name,                    
+
+                   emp_status,
+
+                   employee_type,
+
+                   business_segment_id,
+
+                   business_segment,      
+
+                   sub_business_id,
+
+                   sub_business,
+
+                   organization_id,      
+
+                   organization_name,
+
+                   gold_id,
+
+                   job_title,            
+
+                   job_function,
+
+                   job_family,
+
+                   location_country,
+
+                   payroll_country,
+
+                   currency,                
+
+                   company_id,
+
+                   company_description,
+
+                   baker_workday_pay_group,              
+
+                   hire_date,
+
+                   effective_date,
+
+                   location_city,
+
+                   location_region,
+
+                   manager_emp_id,            
+
+                   management_level,
+
+                   pay_rate_type,
+
+                   baker_network_id,
+
+                   job_profile_description,
+
+                   first_name,
+
+                   last_name,
+
+                   direct_indirect,
+
+                   cost_center_id,
+
+                   cost_center_description,
+
+                   current_workday_costing_string,
+
+                   supervisory_organization_id,
+
+                   supervisory_organization_description,
+
+                   company_hierarchy,
+
+                   employee_email_work,
+
+                   termination_date,
+ 
+  pay_group_name,
+ 
+  region
+
+                 from   bhecms.bh_ecs_stg_wd_requests  a
+
+            where  upper(process_status) = 'N'
+
+                    and    upper(event_type) in ('HIRE','LIFE CYCLE','REHIRE','HIRR','TERM','TERMR')
+
+            and    seq_id = (select max(seq_id)
+
+                             from   bhecms.bh_ecs_stg_wd_requests  b
+
+                                       where  b.wd_employee_id = a.wd_employee_id))
+
+  loop
+
+     
+
+      begin
+
+       
+
+           -- If a new Life Cycle request comes in with a lower effective date than an existing
+
+           -- Proposed Change request having an higher effective date, we need to cancel the
+
+           -- Proposed Change request as Life Cycle request takes precedence.  
+
+           if upper(i.event_type) = 'LIFE CYCLE' then
+
+             select costing_request_type, costing_request_id
+
+             into   m_request_type, m_request_id
+
+             from   bhecms.bh_ecs_costing_requests
+
+             where  wd_employee_id = i.wd_employee_id
+
+             and    costing_request_id = (select max(costing_request_id)
+
+                                          from   bhecms.bh_ecs_costing_requests
+
+                                          where  wd_employee_id = i.wd_employee_id);
+
+             if upper(m_request_type) = 'PROPOSED CHANGE' then
+
+               select effective_date, costing_request_detail_id
+
+               into   m_effective_date, m_request_detail_id
+
+               from   bhecms.bh_ecs_costing_request_details
+
+               where  wd_employee_id = i.wd_employee_id
+
+               and    costing_request_detail_id = (select max(costing_request_detail_id)
+
+                                                   from   bhecms.bh_ecs_costing_request_details
+
+                                                   where  wd_employee_id = i.wd_employee_id);
+
+            if m_effective_date > i.effective_date then
+
+                 update bhecms.bh_ecs_costing_request_details
+
+                 set    status = 'CANCELED'
+
+                 where  costing_request_detail_id = m_request_detail_id;
+
+              update bhecms.bh_ecs_costing_requests
+
+                 set    costing_request_status = 'CANCELED',
+
+                        costing_request_close_date = now(),
+
+                        costing_request_reason = trim(costing_request_reason)||' - Request canceled - New Life Cycle request with start date '||to_char(i.start_date,'yyyy/mm/dd')||' lesser than Proposed Change effective date '||to_char(m_effective_date,'yyyy/mm/dd')||' takes precedence'
+
+              where  costing_request_id = m_request_id;
+
+                 update bhecms.bh_ecs_emp_details
+
+                 set    end_date = now()
+
+                 where  wd_employee_id = i.wd_employee_id
+
+                 and    costing_request_detail_id = m_request_detail_id
+
+                 and    end_date is null;
+
+               end if;                                              
+
+             end if;
+
+           end if;
+
+       
+
+        if (case when upper(i.event_type) in ('HIRE','REHIRE') then i.hire_date else i.effective_date end) <= now() then
+
+           
+
+          begin
+
+            update bhecms.bh_ecs_emp_details
+
+            set    end_date = (case when upper(i.event_type) in ('HIRE','REHIRE') then i.hire_date else i.effective_date end)-interval '1 day'
+
+            where  wd_employee_id = i.wd_employee_id
+
+                 and    end_date is null;
+
+          exception
+
+            when others then
+
+              raise 'Error in updating end date in emp details table %', sqlerrm USING errcode = 50001;
+
+          end;
+
+       
+
+           end if;
+
+         
+
+           if upper(i.event_type) = 'HIRR' then
+
+         
+
+             select start_date
+
+             into   mStartDate
+
+             from   bhecms.bh_ecs_emp_details              emp,
+
+                      bhecms.bh_ecs_costing_requests         req,
+
+                      bhecms.bh_ecs_costing_request_details  rqd
+
+             where  req.costing_request_id = rqd.costing_request_id
+
+             and    rqd.costing_request_detail_id = emp.costing_request_detail_id
+
+             and    emp.wd_employee_id = i.wd_employee_id
+
+             and    emp.end_date is null
+
+             and    emp.termination_date is null
+
+             and    upper(req.costing_request_type) = 'HIRE';
+
+             
+
+             if i.hire_date <= mStartDate then
+
+                                             
+
+               begin
+
+                   update bhecms.bh_ecs_emp_details
+
+              set    emp_status = 'InActive',
+
+                     wd_outbound_status = 'N',
+
+                     hrdl_outbound_status = 'N'
+
+              where  wd_employee_id = i.wd_employee_id
+
+                   and    end_date is null
+
+                   and    termination_date is null
+
+                   and    costing_request_detail_id in (select rqd.costing_request_detail_id
+
+                                                        from   bhecms.bh_ecs_costing_requests         req,
+
+                                                               bhecms.bh_ecs_costing_request_details  rqd
+
+                                                        where  req.costing_request_id = rqd.costing_request_id
+
+                                                        and    req.wd_employee_id = i.wd_employee_id);
+
+                                                     
+
+                   update bhecms.bh_ecs_costing_requests
+
+                   set    costing_request_status = 'CANCELED',
+
+                          costing_request_reason = 'Hire Rescind',
+
+                          costing_request_close_date = now(),
+
+                          last_updated_by = 'System',
+
+                          last_updated_date = now()
+
+                   where  wd_employee_id = i.wd_employee_id;
+
+                 
+
+                   update bhecms.bh_ecs_costing_request_details
+
+                   set    status = 'CANCELED',
+
+                          last_updated_by = 'System',
+
+                          last_updated_date = now()
+
+                   where  wd_employee_id = i.wd_employee_id
+
+                   and    costing_request_id in (select costing_request_id
+
+                                                 from   bhecms.bh_ecs_costing_requests
+
+                                                 where  wd_employee_id = i.wd_employee_id);
+
+                   continue;
+
+                 
+
+                 exception
+
+              when others then
+
+                raise 'Error in updating emp details table to set as Inactive for Hire Rescind %', sqlerrm USING errcode = 50001;
+
+                 end;
+
+             
+
+             else
+
+               continue;  --TBD
+
+             end if;
+
+           
+
+           end if;
+
+         
+
+           if upper(i.event_type) in ('TERM','TERMR') then
+
+         
+
+             begin
+
+                 
+
+                 select rqd.cost_type, rqd.direct_indirect,rqd.proposed_costing_string,
+
+                        rqcl.company_code, rqcl.cost_center, rqcl.function_code, rqcl.product_line,
+
+                        rqcl.project_code, rqcl.reference_code, rqcl.legacy_adn
+
+                 into   m_cost_type, m_direct_indirect, m_proposed_cstring,
+
+                        m_company_code, m_cost_center, m_function_code, m_product_line,
+
+                        m_project_code, m_reference_code, m_legacy_adn
+
+                 from   bhecms.bh_ecs_costing_request_details  rqd,
+
+                        bhecms.bh_ecs_costing_request_cl       rqcl
+
+               where  rqd.wd_employee_id = i.wd_employee_id
+
+               and    rqd.costing_request_detail_id = rqcl.costing_request_detail_id
+
+               and    rqd.costing_request_id = (select max(costing_request_id)
+
+                                                from   bhecms.bh_ecs_costing_requests
+
+                                                where  wd_employee_id = i.wd_employee_id
+
+                                                and    upper(costing_request_type) = 'LIFE CYCLE'
+
+                                                and    upper(costing_request_status) = 'APPROVED');
+
+             
+
+               exception
+
+            when others then
+
+              raise 'Error in deriving costing data for last approved %', sqlerrm USING errcode = 50001;
+
+               end;                                    
+
+           
+
+           end if;
+
+         
+
+           begin
+
+               
+
+          insert into bhecms.bh_ecs_emp_details(wd_employee_id, sso_id, emp_name, emp_status, emp_category,
+
+             gold_id, business_segment_id, business_segment, sub_business_id, sub_business,
+
+             organization_id, organization_name, job_title, job_function, job_family, loc_country, currency_code,
+
+             company_id, company_description, pay_group, start_date, end_date, region, loc_city, first_name, last_name,
+
+             cost_center_id, cost_center_description, current_costing_string,
+
+             wd_outbound_status, hrdl_outbound_status, management_level,
+
+             supervisory_organization_id, supervisory_organization_description, company_hierarchy, pay_group_name,
+
+             manager_emp_id, baker_network_id, job_profile_description, employee_email_work, termination_date,
+
+             created_by, created_date, last_updated_by, last_updated_date,pay_rate_type,payroll_country)
+
+          values(i.wd_employee_id, i.sso_id, i.emp_name,
+
+                 (case when upper(i.event_type) in ('TERM') then 'InActive' else i.emp_status end),
+
+                 i.employee_type, i.gold_id,
+
+                 i.business_segment_id, i.business_segment, i.sub_business_id, i.sub_business,
+
+                           i.organization_id, i.organization_name, i.job_title,
+
+                 i.job_function, i.job_family, i.location_country, i.currency, i.company_id, i.company_description,
+
+                 i.baker_workday_pay_group,
+
+                 (case when upper(i.event_type) in ('HIRE','REHIRE') then i.hire_date else i.effective_date end),
+
+                 null, i.location_region, i.location_city, i.first_name, i.last_name, substring(i.cost_center_id,5),
+
+                 i.cost_center_description, i.current_workday_costing_string,
+
+                 (case when upper(i.event_type) in ('TERM') then 'N' else null end),
+
+                 (case when upper(i.event_type) in ('TERM') then 'N' else null end), i.management_level,
+
+                 i.supervisory_organization_id, i.supervisory_organization_description,i.company_hierarchy, i.pay_group_name,
+
+                 i.manager_emp_id, i.baker_network_id, i.job_profile_description, i.employee_email_work,
+
+                 i.termination_date, 'System', now(), 'System', now(),i.pay_rate_type,i.payroll_country);
+
+ 
+
+          if not found then
+
+            p_out_msg := 'no records inserted in emp_details table : ' || sqlerrm;
+
+          end if;
+
+        exception
+
+          when others then
+
+            raise 'Error in inserting into emp details table % ', sqlerrm USING errcode = 50001;
+
+        end;
+
+       
+
+        --if upper(i.event_type) not in ('TERM') then
+
+       
+
+          begin
+
+            insert into bhecms.bh_ecs_costing_requests
+
+             (costing_request_type, costing_request_reason, wd_employee_id, costing_request_status,
+
+                   costing_request_creation_date, created_by, created_date, last_updated_by, last_updated_date)
+
+            values((case
+
+                      when upper(i.event_type) in ('HIRE','REHIRE') then
+
+                        'Hire'
+
+                      when upper(i.event_type) in ('DTA','TERM') then
+
+                        'Life Cycle'
+
+                      else
+
+                        i.event_type
+
+                    end),
+
+                   i.event_type || (case when upper(i.event_type) = 'PROPOSED CHANGE' then '' else ' change' end),
+
+                   i.wd_employee_id,
+
+                   (case when upper(i.event_type) = 'TERM' then 'TERMINATED' else 'PENDING_VALIDATION' end),
+
+                   now(), 'System', now(), 'System', now());
+
+            if not found then
+
+              p_out_msg := 'no records inserted in requests table : ' || sqlerrm;
+
+            end if;
+
+          exception
+
+            when others then
+
+                      raise 'Error in inserting into requests table %', sqlerrm USING errcode = 50001;
+
+          end;
+
+                     
+
+               begin
+
+            select costing_request_id
+
+            into   m_request_id
+
+            from   bhecms.bh_ecs_costing_requests
+
+            where  wd_employee_id = i.wd_employee_id
+
+                    --and    upper(costing_request_status) = 'PENDING_VALIDATION'
+
+                    and    costing_request_id = (select max(costing_request_id)
+
+                                         from   bhecms.bh_ecs_costing_requests  b
+
+                                                   where  b.wd_employee_id = i.wd_employee_id);
+
+          exception
+
+            when others then
+
+                      raise 'Error in deriving request Id %', sqlerrm USING errcode = 50001;
+
+          end;
+
+                     
+
+               begin
+
+            insert into bhecms.bh_ecs_costing_request_details
+
+              (effective_date, wd_employee_id, sso_id, costing_request_id,
+
+                       cost_type, direct_indirect, proposed_costing_string,
+
+               status, created_by, created_date, last_updated_by, last_updated_date)
+
+            values((case when upper(i.event_type) in ('HIRE','REHIRE') then i.hire_date else i.effective_date end),
+
+                   i.wd_employee_id, i.sso_id, m_request_id,
+
+                   (case when upper(i.event_type) in ('TERM','TERMR') then m_cost_type else null end),
+
+                   (case when upper(i.event_type) in ('TERM','TERMR') then m_direct_indirect else i.direct_indirect end),
+
+                   (case when upper(i.event_type) in ('TERM','TERMR') then m_proposed_cstring else null end),
+
+                   (case when upper(i.event_type) = 'TERM' then 'TERMINATED' else null end),
+
+                   'System', now(), 'System', now());
+
+             if not found then
+
+              p_out_msg := 'no records inserted in request_details table : ' || sqlerrm;
+
+            end if;
+
+          exception
+
+            when others then
+
+                      raise 'Error in inserting into request details table %', sqlerrm USING errcode = 50001;
+
+          end;
+
+                     
+
+               begin
+
+            select a.costing_request_detail_id
+
+                    into   m_request_detail_id
+
+            from   bhecms.bh_ecs_costing_request_details a
+
+            where  a.wd_employee_id = i.wd_employee_id
+
+            and    a.costing_request_detail_id = (select max(costing_request_detail_id)
+
+                                                          from   bhecms.bh_ecs_costing_request_details
+
+                                                                         where  wd_employee_id = i.wd_employee_id );
+
+          exception
+
+            when others then
+
+                      raise 'Error in deriving request details Id %', sqlerrm USING errcode = 50001;
+
+          end;
+
+                     
+
+               update bhecms.bh_ecs_emp_details
+
+          set    costing_request_detail_id = m_request_detail_id
+
+          where  wd_employee_id = i.wd_employee_id
+
+          and    end_date is null
+
+          and    seq_id = (select max(seq_id)
+
+                                from   bhecms.bh_ecs_emp_details
+
+                                        where  wd_employee_id = i.wd_employee_id);
+
+                                     
+
+               select count(parent_legal_entity)
+
+             into   nParentLe
+
+          from   bhecms.bh_ecs_master_parent_le
+
+          where  legal_entity = (select gold_id
+
+                                 from   bhecms.bh_ecs_emp_details
+
+                                 where  wd_employee_id = i.wd_employee_id
+
+                                 and    costing_request_detail_id = m_request_detail_id
+
+                                 and    end_date is null);
+
+                               
+
+          update bhecms.bh_ecs_emp_details
+
+          set    parent_gold_id = (case
+
+                                     when nParentLe = 0 then
+
+                                       i.gold_id
+
+                                     else
+
+                                       (select parent_legal_entity
+
+                                           from   bhecms.bh_ecs_master_parent_le
+
+                                        where  legal_entity = i.gold_id)
+
+                                   end)
+
+          where  wd_employee_id = i.wd_employee_id
+
+          and    costing_request_detail_id = m_request_detail_id
+
+          and    seq_id = (select max(seq_id)
+
+                                from   bhecms.bh_ecs_emp_details
+
+                                        where  wd_employee_id = i.wd_employee_id);                    
+
+                                       
+
+             begin                    
+
+               insert into bhecms.bh_ecs_costing_request_cl
+
+                   (costing_request_detail_id,
+
+                    company_code, cost_center, function_code, product_line,
+
+                    project_code, reference_code, legacy_adn,
+
+                       created_by, created_date, last_updated_by, last_updated_date)
+
+                 values(m_request_detail_id,
+
+                        (case when upper(i.event_type) in ('TERM','TERMR') then m_company_code else null end),
+
+                        (case when upper(i.event_type) in ('TERM','TERMR') then m_cost_center else null end),
+
+                        (case when upper(i.event_type) in ('TERM','TERMR') then m_function_code else null end),
+
+                        (case when upper(i.event_type) in ('TERM','TERMR') then m_product_line else null end),
+
+                        (case when upper(i.event_type) in ('TERM','TERMR') then m_project_code else null end),
+
+                        (case when upper(i.event_type) in ('TERM','TERMR') then m_reference_code else null end),
+
+                        (case when upper(i.event_type) in ('TERM','TERMR') then m_legacy_adn else null end),
+
+                        'System', now(), 'System', now());
+
+               exception
+
+            when others then
+
+                      raise 'Error in inserting into request costing ledger table %', sqlerrm USING errcode = 50001;
+
+          end;
+
+        /*
+
+        else
+
+       
+
+          begin
+
+            select a.costing_request_detail_id
+
+                    into   m_request_detail_id
+
+            from   bhecms.bh_ecs_costing_request_details a
+
+            where  a.wd_employee_id = i.wd_employee_id
+
+            and    a.costing_request_detail_id = (select max(costing_request_detail_id)
+
+                                                          from   bhecms.bh_ecs_costing_request_details
+
+                                                                         where  wd_employee_id = i.wd_employee_id );
+
+          exception
+
+            when others then
+
+                      raise 'Error in deriving request details Id %', sqlerrm USING errcode = 50001;
+
+          end;
+
+       
+
+          update bhecms.bh_ecs_emp_details
+
+          set    costing_request_detail_id = m_request_detail_id
+
+          where  wd_employee_id = i.wd_employee_id
+
+          and    end_date is null
+
+          and    seq_id = (select max(seq_id)
+
+                                from   bhecms.bh_ecs_emp_details
+
+                                        where  wd_employee_id = i.wd_employee_id); */
+
+                                       
+
+             --end if; -- not in 'TERM'
+
+           
+
+             begin
+
+          update bhecms.bh_ecs_stg_wd_requests
+
+          set    process_status = 'P',
+
+                 last_updated_date = now()
+
+          where  wd_employee_id = i.wd_employee_id
+
+          and    upper(process_status) = 'N';
+
+ 
+
+          if not found then
+
+            p_out_msg := 'process_status not updated : ';
+
+          end if;
+
+ 
+
+        exception
+
+          when others then
+
+                    raise 'Error in updating process status in stage table %', sqlerrm USING errcode = 50001;
+
+        end;
+
+     
+
+        if upper(i.event_type) not in ('TERM') then
+
+     
+
+        -----------------------------------------------------------------------------------------------
+
+             -- Inserting into Workflow tables starts
+
+             -----------------------------------------------------------------------------------------------
+
+           for i in (select a.costing_request_id, a.costing_request_reason, a.wd_employee_id, a.costing_request_status,
+
+                              b.emp_category, b.product_company_id, b.gold_id, b.organization_name,
+
+                              b.business_segment, b.sub_business, b.loc_country, b.region
+
+                  from   bhecms.bh_ecs_costing_requests  a,
+
+                         bhecms.bh_ecs_emp_details  b,
+
+                              bhecms.bh_ecs_costing_request_details  c
+
+                  where  a.wd_employee_id = b.wd_employee_id
+
+                  and    b.wd_employee_id = c.wd_employee_id
+
+                  and    b.costing_request_detail_id = c.costing_request_detail_id
+
+                  and    a.costing_request_id = c.costing_request_id
+
+                  and    b.end_date is null
+
+                  and    upper(a.costing_request_type) <> 'PROPOSED CHANGE'
+
+                  and    upper(a.costing_request_status) = 'PENDING_VALIDATION'
+
+                  and    not exists (select 1
+
+                                     from   bhecms.bh_ecs_costing_request_wf wkf
+
+                                             where  wkf.costing_request_id = a.costing_request_id))
+
+        loop                                                        
+
+               
+
+               begin
+
+            insert into bhecms.bh_ecs_costing_request_wf
+
+             (costing_request_id, workflow_name, workflow_status, created_by, created_date, last_updated_by, last_updated_date)
+
+            values(i.costing_request_id, 'COSTINGUPDATEWORKFLOW', 'ASSIGNED', 'System', now(), 'System', now());
+
+            if not found then
+
+              p_out_msg := 'no records inserted in workflows table : ' || sqlerrm;
+
+            end if;
+
+          exception
+
+            when others then
+
+                      raise 'Error in inserting into workflows table %', sqlerrm USING errcode = 50001;
+
+          end;
+
+             
+
+               begin
+
+            select workflow_id
+
+            into   m_workflow_id
+
+            from   bhecms.bh_ecs_costing_request_wf
+
+            where  costing_request_id = i.costing_request_id;
+
+          exception
+
+            when others then
+
+                      raise 'Error in deriving workflow Id %', sqlerrm USING errcode = 50001;
+
+          end;
+
+             
+
+               begin
+
+            insert into bhecms.bh_ecs_costing_request_wf_steps
+
+             (workflow_id, workflow_step_no, step_role_name, step_status, step_sub_status, step_start_date)
+
+            values(m_workflow_id, 1, 'COSTING ANALYST', 'CURRENT', 'ASSIGNED', now());
+
+            if not found then
+
+              p_out_msg := 'no records inserted in workflow steps table : ' || sqlerrm;
+
+            end if;
+
+          exception
+
+            when others then
+
+                      raise 'Error in inserting into workflow steps table %', sqlerrm USING errcode = 50001;
+
+          end;
+
+             
+
+               begin
+
+            select workflow_step_id
+
+            into   m_workflow_step_id
+
+            from   bhecms.bh_ecs_costing_request_wf_steps
+
+            where  workflow_id = m_workflow_id
+
+               and    upper(step_role_name) = 'COSTING ANALYST';
+
+          exception
+
+            when others then
+
+                      raise 'Error in deriving workflow step Id %', sqlerrm USING errcode = 50001;
+
+          end;
+
+             
+
+               for j in (select distinct urm.wd_employee_id, urm.sso_id, urm.legal_entity,
+
+                                i.organization_name, i.business_segment, i.sub_business, i.loc_country, i.region
+
+                            from   bhecms.bh_ecs_user_role_mapping urm
+
+                    where  (case
+
+                                   when urm.legal_entity is null then
+
+                                     true
+
+                                   else
+
+                                     urm.legal_entity = coalesce(i.gold_id,'X')
+
+                                 end)
+
+                         and    (case
+
+                                   when urm.organization_name is null then
+
+                                     true
+
+                                   else
+
+                                     urm.organization_name = coalesce(i.organization_name,'X')
+
+                                end)      
+
+                       and    (case
+
+                                   when urm.business_segment is null then
+
+                                     true
+
+                                   else
+
+                                     urm.business_segment = coalesce(i.business_segment,'X')
+
+                                 end)
+
+                         and    (case
+
+                                   when urm.sub_business is null then
+
+                                     true
+
+                                   else
+
+                                     urm.sub_business = coalesce(i.sub_business,'X')
+
+                                 end)
+
+                         and    (case
+
+                                   when urm.country is null then
+
+                                     true
+
+                                   else
+
+                                     urm.country = coalesce(i.loc_country,'X')
+
+                                 end)
+
+                         and    (case
+
+                                   when urm.region is null then
+
+                                     true
+
+                                   else
+
+                                     urm.region = coalesce(i.region,'X')
+
+                                 end)      
+
+                            and    urm.role_id = (select role_id
+
+                                                  from   bhecms.bh_ecs_master_role
+
+                                                    where  upper(role_name) = 'COSTING ANALYST'))
+
+          loop
+
+                   
+
+                    begin
+
+              insert into bhecms.bh_ecs_costing_request_wf_steps_assignments
+
+                (workflow_step_id, assignee_empid, assignee_sso, action_taken, notification_status)
+
+              values(m_workflow_step_id, j.wd_employee_id, j.sso_id, 'SUBMITTED', 'OPEN');
+
+                      if not found then
+
+                p_out_msg := 'no records inserted in wf steps assignments table : ' || sqlerrm;
+
+              end if;
+
+                    exception
+
+              when others then
+
+                        raise 'Error in inserting into workflow steps assignments table %', sqlerrm USING errcode = 50001;
+
+            end;
+
+               
+
+          end loop;
+
+             
+
+             end loop;
+
+        -----------------------------------------------------------------------------------------------
+
+             -- Inserting into Workflow tables ends
+
+             -----------------------------------------------------------------------------------------------
+
+             end if;
+
+           
+
+      exception
+
+        when sqlstate '50001' then
+
+          p_out_msg := coalesce(p_out_msg, 'Error loading from stage table : ' || sqlerrm);
+
+          begin
+
+            update bhecms.bh_ecs_stg_wd_requests
+
+            set    process_status = 'E',
+
+                   error_desc = p_out_msg
+
+            where  wd_employee_id = i.wd_employee_id
+
+            and    upper(process_status) = 'N';
+
+          end;
+
+           
+
+      end;
+
+ 
+
+  end loop;
+
+  p_out_msg := coalesce(p_out_msg,'SUCCESS');
+
+ 
+
+exception
+
+  when others then
+
+    p_out_msg := 'exception in loading final tables : ' || sqlerrm;
+
+ 
+
+end;
+
+$BODY$;
+

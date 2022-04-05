@@ -1,0 +1,11 @@
+spring.datasource.url=jdbc:postgresql://10.167.38.44:5432/bhecmsprod
+spring.datasource.username=bhecmsproduser
+spring.datasource.password=password1234#
+
+spring.datasource.url=jdbc:postgresql://10.168.59.36:5432/bhecmsprod
+spring.datasource.username=bhecmsqauser
+spring.datasource.password=change2me@987
+
+spring.datasource.url=jdbc:postgresql://10.168.59.14:5432/bhecmsdev
+spring.datasource.username=bhecmsdevuser
+spring.datasource.password=change2me@987

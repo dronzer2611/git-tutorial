@@ -1,0 +1,95 @@
+-- Table: bhecms.file_master
+
+-- DROP TABLE bhecms.file_master;
+
+CREATE TABLE bhecms.file_master
+(
+    file_id serial primary key,
+    file_master_name character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    file_master_desc character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    download_name character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    total_columns integer NOT NULL,
+    db_table_name character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    active character(1) COLLATE pg_catalog."default" NOT NULL,
+    create_dtm timestamp without time zone NOT NULL,
+    update_dtm timestamp without time zone NOT NULL,
+    created_by character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    updated_by character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    schema_name character(100) COLLATE pg_catalog."default" NOT NULL
+)
+
+-- Table: bhecms.file_upload
+
+-- DROP TABLE bhecms.file_upload;
+
+CREATE TABLE bhecms.file_upload
+(
+    upload_id serial primary key,
+    file_id integer NOT NULL,
+    file_name character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    csv_file_location character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    row_passed integer,
+    row_failed integer,
+    total_rows integer,
+    user_comment text COLLATE pg_catalog."default",
+    db_processed character(1) COLLATE pg_catalog."default",
+    create_dtm timestamp without time zone NOT NULL,
+    update_dtm timestamp without time zone NOT NULL,
+    created_by character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    updated_by character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    file_format character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    archive_location character varying(1000) COLLATE pg_catalog."default"
+)
+
+-- Table: bhecms.bh_integration_path
+
+-- DROP TABLE bhecms.bh_integration_path;
+
+CREATE TABLE bhecms.bh_integration_path
+(
+    source_path character varying(1000) COLLATE pg_catalog."default",
+    archive_path character varying(1000) COLLATE pg_catalog."default",
+    is_active character(1) COLLATE pg_catalog."default",
+    integration_type character varying(50) COLLATE pg_catalog."default"
+)
+
+-- Table: bhecms.bh_template
+
+-- DROP TABLE bhecms.bh_template;
+
+CREATE TABLE bhecms.bh_template
+(
+    file_name character varying(150) COLLATE pg_catalog."default",
+    template_name character varying(150) COLLATE pg_catalog."default",
+    is_active character(1) COLLATE pg_catalog."default"
+)
+
+-- Table: bhecms.file_col_ref
+
+-- DROP TABLE bhecms.file_col_ref;
+
+CREATE TABLE bhecms.file_col_ref
+(
+    file_id integer NOT NULL,
+    file_column_index integer NOT NULL,
+    data_type_postgres character varying(100) COLLATE pg_catalog."default" NOT NULL,
+    input_header_text character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    db_column_name character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    create_dtm timestamp without time zone NOT NULL,
+    update_dtm timestamp without time zone NOT NULL,
+    created_by character varying(1000) COLLATE pg_catalog."default" NOT NULL,
+    updated_by character varying(1000) COLLATE pg_catalog."default" NOT NULL
+)
+
+-- Table: bhecms.logger
+
+-- DROP TABLE bhecms.logger;
+
+CREATE TABLE bhecms.logger
+(
+    upload_or_run_id integer NOT NULL,
+    log text COLLATE pg_catalog."default",
+    create_dtm timestamp without time zone NOT NULL
+)
+
+
